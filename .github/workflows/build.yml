@@ -34,7 +34,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # electron-builder will handle the release because release: true in package.json
-          # or we can pass flags here.
-          npx electron-builder --win --publish always --config.extraMetadata.version=${{ github.ref_name }}
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          npx electron-builder --win --publish always --config.extraMetadata.version=$version
+
 
