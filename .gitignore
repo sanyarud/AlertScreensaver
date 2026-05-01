@@ -1,0 +1,9 @@
+node_modules
+dist
+release*
+*.log
+config.json
+.DS_Store
+.env
+build
+out
