@@ -31,8 +31,10 @@ jobs:
           C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe /nologo /target:winexe /out:AlertUAScreensaver.scr wrapper.cs
 
       - name: Build and Release Electron app
-        uses: samuelmeuli/action-electron-builder@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          release: true
-          # We manually include the .scr in the build via extraFiles in package.json (will update next)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # electron-builder will handle the release because release: true in package.json
+          # or we can pass flags here.
+          npx electron-builder --win --publish always --config.extraMetadata.version=${{ github.ref_name }}
+
