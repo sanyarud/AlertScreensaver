@@ -15,7 +15,6 @@ permissions:
   contents: write
 
 jobs:
-  # ── Windows: NSIS installer + .scr screensaver ──────────────
   build-windows:
     runs-on: windows-latest
     steps:
@@ -33,5 +32,57 @@ jobs:
         run: npm run build
 
       - name: Compile C# screensaver wrapper
+        run: C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe /nologo /target:winexe /out:AlertUAScreensaver.scr wrapper.cs
+
+      - name: Determine version
+        id: ver
+        shell: bash
         run: |
-          C:\Windows\Microsoft.NET\Framework4.0.30319
+          REF="${{ github.ref_name }}"
+          if [[ "$REF" == v* ]]; then
+            echo "value=${REF#v}" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and publish Windows release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish always --config.extraMetadata.version=${{ steps.ver.outputs.value }}
+
+  build-macos:
+    runs-on: macos-latest
+    needs: build-windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build React app
+        run: npm run build
+
+      - name: Determine version
+        id: ver
+        shell: bash
+        run: |
+          REF="${{ github.ref_name }}"
+          if [[ "$REF" == v* ]]; then
+            echo "value=${REF#v}" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and publish macOS release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: |
+          npx electron-builder --mac dmg --publish always \
+            --config.extraFiles=[] \
+            --config.extraMetadata.version=${{ steps.ver.outputs.value }}
