@@ -1,7 +1,7 @@
 {
   "name": "screensaver",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
@@ -15,11 +15,10 @@
   "build": {
     "appId": "com.sanyarud.alertuascreensaver",
     "productName": "AlertUAScreensaver",
-    "directories": {
-      "output": "release"
-    },
+    "directories": { "output": "release" },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "extraFiles": ["AlertUAScreensaver.scr"]
     },
     "nsis": {
       "oneClick": false,
@@ -28,9 +27,15 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },
-    "extraFiles": [
-      "AlertUAScreensaver.scr"
-    ]
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.utilities"
+    },
+    "dmg": {
+      "title": "AlertUA Screensaver",
+      "background": null,
+      "window": { "width": 540, "height": 380 }
+    }
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
