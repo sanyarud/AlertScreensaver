@@ -8,17 +8,78 @@ export interface AggregatedAlert {
   sources: string[];
 }
 
-export async function getAggregatedAlerts(): Promise<AggregatedAlert[]> {
+export type IotStatus = 'A' | 'P' | 'N';
+
+export interface AggregatedResult {
+  alerts: AggregatedAlert[];
+  // Per-oblast classification from alerts.in.ua's IoT compact endpoint —
+  // 'A' = full alert, 'P' = partial, 'N' = clear. Drives map colour so
+  // it matches alerts.in.ua's own widget (raw active.json gives raion-level
+  // events that don't trivially map back to oblasts).
+  iotStatus: Record<string, IotStatus>;
+}
+
+// Order is alphabetical Ukrainian, with АР Крим at 0 and м. Київ /
+// м. Севастополь alphabetised by their leading К/С (NOT by "м.").
+const IOT_ORDER: readonly string[] = [
+  'Автономна Республіка Крим',
+  'Волинська область',
+  'Вінницька область',
+  'Дніпропетровська область',
+  'Донецька область',
+  'Житомирська область',
+  'Закарпатська область',
+  'Запорізька область',
+  'Івано-Франківська область',
+  'м. Київ',
+  'Київська область',
+  'Кіровоградська область',
+  'Луганська область',
+  'Львівська область',
+  'Миколаївська область',
+  'Одеська область',
+  'Полтавська область',
+  'Рівненська область',
+  'м. Севастополь',
+  'Сумська область',
+  'Тернопільська область',
+  'Харківська область',
+  'Херсонська область',
+  'Хмельницька область',
+  'Черкаська область',
+  'Чернівецька область',
+  'Чернігівська область',
+];
+
+async function fetchIotStatus(apiKey: string): Promise<Record<string, IotStatus>> {
+  try {
+    // The IoT compact endpoint takes the token as a query parameter, not Bearer.
+    const r = await fetch(
+      `https://api.alerts.in.ua/v1/iot/active_air_raid_alerts_by_oblast.json?token=${apiKey}`
+    );
+    if (!r.ok) return {};
+    const raw = (await r.text()).replace(/[^APN]/g, '');
+    if (raw.length !== 27) return {};
+    const result: Record<string, IotStatus> = {};
+    for (let i = 0; i < 27; i++) result[IOT_ORDER[i]] = raw[i] as IotStatus;
+    return result;
+  } catch (e) {
+    console.error('IoT status fetch failed', e);
+    return {};
+  }
+}
+
+export async function getAggregatedAlerts(): Promise<AggregatedResult> {
   try {
     // @ts-ignore
     const config = await window.electronAPI.getConfig();
-    
+
     if (!config.alertsApiKey) {
       console.warn('API keys not configured');
-      return [];
+      return { alerts: [], iotStatus: {} };
     }
 
-    const [alertsRes, uaRes] = await Promise.all([
+    const [alertsRes, uaRes, iotStatus] = await Promise.all([
       fetch(`https://api.alerts.in.ua/v1/alerts/active.json`, {
         headers: { 'Authorization': `Bearer ${config.alertsApiKey}` }
       }).catch(() => null),
@@ -27,7 +88,8 @@ export async function getAggregatedAlerts(): Promise<AggregatedAlert[]> {
           'Authorization': `${config.ukraineAlarmApiKey}`,
           'accept': 'application/json'
         }
-      }).catch(() => null) : Promise.resolve(null)
+      }).catch(() => null) : Promise.resolve(null),
+      fetchIotStatus(config.alertsApiKey),
     ]);
 
     let alertsInUa = [];
@@ -75,9 +137,9 @@ export async function getAggregatedAlerts(): Promise<AggregatedAlert[]> {
       }
     }
 
-    return Array.from(aggregated.values());
+    return { alerts: Array.from(aggregated.values()), iotStatus };
   } catch (error) {
     console.error('Aggregator error', error);
-    return [];
+    return { alerts: [], iotStatus: {} };
   }
 }

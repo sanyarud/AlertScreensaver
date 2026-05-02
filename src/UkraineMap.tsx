@@ -4,7 +4,7 @@ import {
   ZoomableGroup, Marker,
 } from 'react-simple-maps';
 import { geoCentroid } from 'd3-geo';
-import type { AggregatedAlert } from './aggregatorService';
+import type { AggregatedAlert, IotStatus } from './aggregatorService';
 
 const geoUrl = 'https://code.highcharts.com/mapdata/countries/ua/ua-all.topo.json';
 
@@ -18,16 +18,20 @@ const MAP_W                        = 900;
 const MAP_H                        = 580;
 const MAP_CENTER: [number, number] = [31.1656, 48.3794];
 
-// alerts.in.ua-style colour palette
+// alerts.in.ua-style palette — A and P both render as deep red (the official
+// widget conveys partial nuance via icons, not pink fill).
 const COLOR = {
-  regionNormal:    '#1e2a45',
-  regionNormalHov: '#27355a',
-  regionAlert:     '#8b1a1a',
-  regionAlertHov:  '#a52222',
-  stroke:          'rgba(255,255,255,0.12)',
-  strokeHov:       'rgba(255,255,255,0.35)',
-  labelNormal:     'rgba(180,195,220,0.8)',
-  labelAlert:      'rgba(255,200,200,0.95)',
+  regionNormal:     '#1e2a45',
+  regionNormalHov:  '#27355a',
+  regionAlert:      '#a52a2a',
+  regionAlertHov:   '#c23636',
+  regionPartial:    '#7d2424',
+  regionPartialHov: '#9a2e2e',
+  stroke:           'rgba(255,255,255,0.12)',
+  strokeHov:        'rgba(255,255,255,0.35)',
+  labelNormal:      'rgba(180,195,220,0.8)',
+  labelAlert:       'rgba(255,210,210,0.95)',
+  labelPartial:     'rgba(255,210,210,0.92)',
 };
 
 const hcKeyToRegionMap: Record<string, string> = {
@@ -85,7 +89,12 @@ const FONT_SIZE: Record<string, number> = {
 };
 const DEFAULT_FONT = 10;
 
-export default function UkraineMap({ alerts }: { alerts: AggregatedAlert[] }) {
+interface UkraineMapProps {
+  alerts: AggregatedAlert[];
+  iotStatus?: Record<string, IotStatus>;
+}
+
+export default function UkraineMap({ alerts, iotStatus = {} }: UkraineMapProps) {
   const [mounted, setMounted] = useState(false);
   const [tooltip, setTooltip] = useState<{ name: string; alert?: AggregatedAlert } | null>(null);
 
@@ -132,7 +141,16 @@ export default function UkraineMap({ alerts }: { alerts: AggregatedAlert[] }) {
                     a.regionName === regionName ||
                     a.regionName.includes(regionName.replace(' область', ''))
                   );
-                  const isAlert = !!alert;
+                  const status     = iotStatus[regionName];
+                  const isAlert    = status === 'A';
+                  const isPartial  = status === 'P';
+
+                  const fill   = isAlert ? COLOR.regionAlert
+                                : isPartial ? COLOR.regionPartial
+                                : COLOR.regionNormal;
+                  const fillH  = isAlert ? COLOR.regionAlertHov
+                                : isPartial ? COLOR.regionPartialHov
+                                : COLOR.regionNormalHov;
 
                   return (
                     <Geography
@@ -142,21 +160,21 @@ export default function UkraineMap({ alerts }: { alerts: AggregatedAlert[] }) {
                       onMouseLeave={() => setTooltip(null)}
                       style={{
                         default: {
-                          fill:        isAlert ? COLOR.regionAlert    : COLOR.regionNormal,
+                          fill,
                           stroke:      COLOR.stroke,
                           strokeWidth: 0.5,
                           outline:     'none',
                           transition:  'fill 0.3s',
                         },
                         hover: {
-                          fill:        isAlert ? COLOR.regionAlertHov : COLOR.regionNormalHov,
+                          fill:        fillH,
                           stroke:      COLOR.strokeHov,
                           strokeWidth: 0.8,
                           outline:     'none',
                           cursor:      'pointer',
                         },
                         pressed: {
-                          fill:    isAlert ? COLOR.regionAlertHov : COLOR.regionNormalHov,
+                          fill:    fillH,
                           outline: 'none',
                         },
                       }}
@@ -168,11 +186,12 @@ export default function UkraineMap({ alerts }: { alerts: AggregatedAlert[] }) {
                 {geographies.map((geo) => {
                   const hcKey      = geo.properties['hc-key'];
                   const regionName = hcKeyToRegionMap[hcKey] || geo.properties.name;
-                  const alert      = alerts.find(a =>
-                    a.regionName === regionName ||
-                    a.regionName.includes(regionName.replace(' область', ''))
-                  );
-                  const isAlert  = !!alert;
+                  const status     = iotStatus[regionName];
+                  const isAlert    = status === 'A';
+                  const isPartial  = status === 'P';
+                  const labelColor = isAlert    ? COLOR.labelAlert
+                                    : isPartial ? COLOR.labelPartial
+                                    : COLOR.labelNormal;
                   const label    = toLabel(regionName);
                   const fontSize = FONT_SIZE[hcKey] ?? DEFAULT_FONT;
                   const coords: [number, number] =
@@ -188,7 +207,7 @@ export default function UkraineMap({ alerts }: { alerts: AggregatedAlert[] }) {
                     fontFamily:    'Inter, system-ui, sans-serif',
                     fontSize:      `${fontSize}px`,
                     fontWeight:    500,
-                    fill:          isAlert ? COLOR.labelAlert : COLOR.labelNormal,
+                    fill:          labelColor,
                     pointerEvents: 'none',
                     userSelect:    'none',
                     letterSpacing: '0.03em',

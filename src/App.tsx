@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import UkraineMap from './UkraineMap';
 import { getAggregatedAlerts } from './aggregatorService';
-import type { AggregatedAlert } from './aggregatorService';
+import type { AggregatedAlert, IotStatus } from './aggregatorService';
 
 function App() {
   const [alerts, setAlerts] = useState<AggregatedAlert[]>([]);
+  const [iotStatus, setIotStatus] = useState<Record<string, IotStatus>>({});
   // @ts-ignore
   const [isSettings, setIsSettings] = useState(window.electronAPI?.isSettings || window.location.hash.includes('settings'));
 
@@ -28,8 +29,9 @@ function App() {
     } else {
       // Fetch alerts
       const fetchAlerts = async () => {
-        const data = await getAggregatedAlerts();
-        setAlerts(data);
+        const { alerts, iotStatus } = await getAggregatedAlerts();
+        setAlerts(alerts);
+        setIotStatus(iotStatus);
       };
       fetchAlerts();
       const interval = setInterval(fetchAlerts, 15000);
@@ -77,7 +79,7 @@ function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: 'var(--background)' }}>
-      <UkraineMap alerts={alerts} />
+      <UkraineMap alerts={alerts} iotStatus={iotStatus} />
       {alerts.length === 0 && (
         <div style={{ position: 'absolute', top: '24px', left: '24px', color: 'var(--success)', background: 'rgba(0,0,0,0.5)', padding: '8px 16px', borderRadius: '8px' }}>
           Немає активних тривог
